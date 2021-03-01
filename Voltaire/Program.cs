@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Reflection;
+using System.Collections.Generic;
 using Discord;
 using Discord.WebSocket;
 using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Stripe;
-using System.Linq;
 
 namespace Voltaire
 {
@@ -16,6 +16,7 @@ namespace Voltaire
         private CommandService _commands;
         private DiscordShardedClient _client;
         private IServiceProvider _services;
+        private DataBase _db;
 
         public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
@@ -24,11 +25,12 @@ namespace Voltaire
         {
 
             IConfiguration configuration = LoadConfig.Instance.config;
-            var db = new DataBase(configuration.GetConnectionString("sql"));
+            _db = new DataBase(configuration.GetConnectionString("sql"));
 
             var config = new DiscordSocketConfig {
                 // LogLevel = LogSeverity.Debug,
                 AlwaysDownloadUsers = true,
+                AlwaysAcknowledgeInteractions= false,
                 GatewayIntents = GatewayIntents.GuildMembers |
                    GatewayIntents.Guilds |
                    GatewayIntents.GuildEmojis |
@@ -40,7 +42,7 @@ namespace Voltaire
 
             _client = new DiscordShardedClient(config);
             _client.Log += Log;
-            _client.JoinedGuild += Controllers.Helpers.JoinedGuild.Joined(db);
+            _client.JoinedGuild += Controllers.Helpers.JoinedGuild.Joined(_db);
             // disable joined message for now
             //_client.UserJoined += Controllers.Helpers.UserJoined.SendJoinedMessage;
 
@@ -54,7 +56,7 @@ namespace Voltaire
             _services = new ServiceCollection()
                 .AddSingleton(_client)
                 .AddSingleton(_commands)
-                .AddSingleton(db)
+                .AddSingleton(_db)
                 .BuildServiceProvider();
 
             await InstallCommandsAsync();
@@ -74,8 +76,59 @@ namespace Voltaire
             // Hook the MessageReceived Event into our Command Handler
             _client.MessageReceived += HandleCommandAsync;
             _client.ReactionAdded += HandleReaction;
+            _client.ShardReady += RegisterCommands;
+            _client.InteractionCreated += MyEventHandler;
             // Discover all of the commands in this assembly and load them.
             await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
+        }
+
+        private async Task RegisterCommands(DiscordSocketClient client)
+        {
+            try
+            {
+                var myGlobalCommand = await _client.Rest.CreateGlobalCommand(new Discord.SlashCommandCreationProperties()
+                    {
+                        Name = "volt",
+                        Description = "Send a message with Voltaire",
+                        Options = new List<Discord.ApplicationCommandOptionProperties>()
+                        {
+                            new ApplicationCommandOptionProperties()
+                            {
+                                Name = "text",
+                                Required = true,
+                                Description = "text of the message",
+                                Type = Discord.ApplicationCommandOptionType.String,
+                            },
+                            new ApplicationCommandOptionProperties()
+                            {
+                                Name = "replyable",
+                                Required = false,
+                                Description = "generate a reply code",
+                                Type = Discord.ApplicationCommandOptionType.Boolean,
+                                Default = false,
+                            }
+                        }
+                    });
+            }
+            catch (Exception e)
+            {
+                var p = e;
+                Console.WriteLine("error registering commands");
+            }
+        }
+
+
+        private async Task MyEventHandler(SocketInteraction arg)
+        {
+            switch(arg.Type) // We want to check the type of this interaction
+            {
+                case InteractionType.ApplicationCommand: // If it is a command
+                await Utility.SlashCommandHandler.Handle(arg, _db); // Handle the command somewhere
+                break;
+                default: // We dont support it
+                Console.WriteLine("Unsupported interaction type: " + arg.Type);
+                break;
+            }
         }
 
         private async Task HandleCommandAsync(SocketMessage messageParam)
@@ -136,7 +189,7 @@ namespace Voltaire
         {
             var result = await _commands.ExecuteAsync(context, argPos, _services);
             if (!result.IsSuccess)
-                await Controllers.Messages.Send.SendErrorWithDeleteReaction(context, result.ErrorReason);
+                await Controllers.Messages.Send.SendErrorWithDeleteReaction(context.Channel, result.ErrorReason);
         }
 
         private Task Log(LogMessage msg)

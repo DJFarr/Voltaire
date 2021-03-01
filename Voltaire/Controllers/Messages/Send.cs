@@ -19,19 +19,19 @@ namespace Voltaire.Controllers.Messages
             switch (candidateGuilds.Count())
             {
                 case 0:
-                    await SendErrorWithDeleteReaction(context, "It doesn't look like you belong to any servers where Voltaire is installed. Please add Voltaire to your desired server.");
+                    await SendErrorWithDeleteReaction(context.Channel, "It doesn't look like you belong to any servers where Voltaire is installed. Please add Voltaire to your desired server.");
                     break;
                 case 1:
                     await SendToGuild.LookupAndSendAsync(candidateGuilds.First(), context, channelName, message, reply, db);
                     break;
                 default:
                     var view = Views.Info.MultipleGuildSendResponse.Response(context, candidateGuilds, message);
-                    await SendErrorWithDeleteReaction(context, view.Item1, view.Item2);
+                    await SendErrorWithDeleteReaction(context.Channel, view.Item1, view.Item2);
                     break;
             }
         }
 
-        public static Func<string, string, Task<IUserMessage>> SendMessageToChannel(IMessageChannel channel, bool replyable, ShardedCommandContext context, bool forceEmbed = false)
+        public static Func<string, string, Task<IUserMessage>> SendMessageToChannel(IMessageChannel channel, bool replyable, SocketUser user, IMessageChannel sendingChannel, bool forceEmbed = false)
         {
             if (!replyable)
             {
@@ -41,26 +41,26 @@ namespace Voltaire.Controllers.Messages
                     if (forceEmbed)
                     {
                         var view = Views.Message.Response(username, message, null);
-                        return await SendMessageAndCatchError(() => { return channel.SendMessageAsync(view.Item1, embed: view.Item2); }, context);
+                        return await SendMessageAndCatchError(() => { return channel.SendMessageAsync(view.Item1, embed: view.Item2); }, sendingChannel);
                     }
 
                     if (string.IsNullOrEmpty(username))
                     {
-                        return await SendMessageAndCatchError(() => { return channel.SendMessageAsync(message); }, context);
+                        return await SendMessageAndCatchError(() => { return channel.SendMessageAsync(message); }, sendingChannel);
                     }
-                    return await SendMessageAndCatchError(() => { return channel.SendMessageAsync($"**{username}**: {message}"); }, context);
+                    return await SendMessageAndCatchError(() => { return channel.SendMessageAsync($"**{username}**: {message}"); }, sendingChannel);
                 };
             }
             return async (username, message) =>
             {
                 var key = LoadConfig.Instance.config["encryptionKey"];
-                var replyHash = Rijndael.Encrypt(context.User.Id.ToString(), key, KeySize.Aes256);
+                var replyHash = Rijndael.Encrypt(user.Id.ToString(), key, KeySize.Aes256);
                 var view = Views.Message.Response(username, message, replyHash.ToString());
-                return await SendMessageAndCatchError(() => { return channel.SendMessageAsync(view.Item1, embed: view.Item2); }, context);
+                return await SendMessageAndCatchError(() => { return channel.SendMessageAsync(view.Item1, embed: view.Item2); }, sendingChannel);
             };
         }
 
-        public static async Task<IUserMessage> SendMessageAndCatchError(Func<Task<IUserMessage>> send, ShardedCommandContext context)
+        public static async Task<IUserMessage> SendMessageAndCatchError(Func<Task<IUserMessage>> send, IMessageChannel channel)
         {
             try
             {
@@ -71,11 +71,11 @@ namespace Voltaire.Controllers.Messages
                 switch (e.DiscordCode)
                 {
                     case 50007:
-                        await context.Channel.SendMessageAsync("Voltaire has been blocked by this user, or they have DMs dsiabled.");
+                        await channel.SendMessageAsync("Voltaire has been blocked by this user, or they have DMs dsiabled.");
                         break;
                     case 50013:
                     case 50001:
-                        await context.Channel.SendMessageAsync("Voltaire doesn't have the " +
+                        await channel.SendMessageAsync("Voltaire doesn't have the " +
                         "permissions required to send this message. Ensure Voltaire can access the channel you are trying to send to, and that it has " +
                         " \"Embed Links\" and \"Use External Emojis\" permission.");
                         break;
@@ -131,9 +131,9 @@ namespace Voltaire.Controllers.Messages
             await context.Message.AddReactionAsync(emote);
         }
 
-        public static async Task SendErrorWithDeleteReaction(ShardedCommandContext context, string errorMessage, Embed embed = null)
+        public static async Task SendErrorWithDeleteReaction(IMessageChannel channel, string errorMessage, Embed embed = null)
         {
-            var message = await context.Channel.SendMessageAsync(errorMessage, embed: embed);
+            var message = await channel.SendMessageAsync(errorMessage, embed: embed);
             await AddReactionToMessage(message);
         }
 

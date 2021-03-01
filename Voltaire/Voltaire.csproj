@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,7 +12,9 @@
 
   <ItemGroup>
     <PackageReference Include="CodenameGenerator" Version="1.2.43" />
-    <PackageReference Include="Discord.Net" Version="2.3.0-dev-20201125.2" />
+    <!-- <PackageReference Include="Discord.Net" Version="2.3.0" /> -->
+    <PackageReference Include="Discord.NetFoxite.Commands" Version="2.3.2-foxite-dev" />
+    <PackageReference Include="Discord.NetFoxite.WebSocket" Version="2.3.2-foxite-dev" />
     <PackageReference Include="DiscordBotsList.Api" Version="1.3.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="3.1.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="3.1.10">

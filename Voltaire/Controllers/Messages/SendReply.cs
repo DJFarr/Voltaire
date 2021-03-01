@@ -20,7 +20,7 @@ namespace Voltaire.Controllers.Messages
             var users = SendDirectMessage.ToUserList(candidateGuilds).Where(x => x.Id.ToString() == candidateId);
             if(users.Count() == 0)
             {
-                await Send.SendErrorWithDeleteReaction(context, "Something is wrong with that reply code. It is possible the sender has left your server.");
+                await Send.SendErrorWithDeleteReaction(context.Channel, "Something is wrong with that reply code. It is possible the sender has left your server.");
                 return;
             }
 
@@ -32,11 +32,11 @@ namespace Voltaire.Controllers.Messages
                 return;
             }
 
-            var prefix = $"{PrefixHelper.ComputePrefix(context, allowedGuild, "someone")} replied";
+            var prefix = $"{PrefixHelper.ComputePrefix(context.User, allowedGuild, "someone")} replied";
 
             // all 'users' here are technically the same user, so just take the first
             var channel = await users.First().GetOrCreateDMChannelAsync();
-            var messageFunction = Send.SendMessageToChannel(channel, replyable, context);
+            var messageFunction = Send.SendMessageToChannel(channel, replyable, context.User, context.Channel);
             var sentMessage = await messageFunction(prefix, message);
             await Send.AddReactionToMessage(sentMessage);
             await Send.SendSentEmote(context);

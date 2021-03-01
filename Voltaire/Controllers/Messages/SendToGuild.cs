@@ -16,7 +16,7 @@ namespace Voltaire.Controllers.Messages
             switch (candidateGuilds.Count())
             {
                 case 0:
-                    await Send.SendErrorWithDeleteReaction(context, "No servers with the specified name could be found. The servers must have Voltaire installed and you must be a member of the server.");
+                    await Send.SendErrorWithDeleteReaction(context.Channel, "No servers with the specified name could be found. The servers must have Voltaire installed and you must be a member of the server.");
                     break;
                 case 1:
                     await LookupAndSendAsync(candidateGuilds.First(), context, channelName, message, replyable, db);
@@ -29,7 +29,7 @@ namespace Voltaire.Controllers.Messages
                         await LookupAndSendAsync(exactNameMatch, context, channelName, message, replyable, db);
                         return;
                     }
-                    await Send.SendErrorWithDeleteReaction(context, "More than one server with the spcified name was found. Please use a more specific server name.");
+                    await Send.SendErrorWithDeleteReaction(context.Channel, "More than one server with the spcified name was found. Please use a more specific server name.");
                     break;
             }
         }
@@ -39,14 +39,14 @@ namespace Voltaire.Controllers.Messages
             var dbGuild = FindOrCreateGuild.Perform(guild, db);
             if (!UserHasRole.Perform(guild, context.User, dbGuild))
             {
-                await Send.SendErrorWithDeleteReaction(context, "You do not have the role required to send messages to this server.");
+                await Send.SendErrorWithDeleteReaction(context.Channel, "You do not have the role required to send messages to this server.");
                 return;
             }
 
             var candidateChannels = guild.TextChannels.Where(x => x.Name.ToLower().Contains(channelName.ToLower()) || x.Id.ToString() == channelName);
             if (!candidateChannels.Any())
             {
-                await Send.SendErrorWithDeleteReaction(context, "The channel you specified couldn't be found. Please specify your channel using the following command: `send (channel_name) (message)` ex: `send some-channel you guys suck`");
+                await Send.SendErrorWithDeleteReaction(context.Channel, "The channel you specified couldn't be found. Please specify your channel using the following command: `send (channel_name) (message)` ex: `send some-channel you guys suck`");
                 return;
             }
 
@@ -58,13 +58,13 @@ namespace Voltaire.Controllers.Messages
 
             if(!IncrementAndCheckMessageLimit.Perform(dbGuild, db))
             {
-                await Send.SendErrorWithDeleteReaction(context, "This server has reached its limit of 50 messages for the month. To lift this limit, ask an admin or moderator to upgrade your server to Voltaire Pro. (This can be done via the `!volt pro` command.)");
+                await Send.SendErrorWithDeleteReaction(context.Channel, "This server has reached its limit of 50 messages for the month. To lift this limit, ask an admin or moderator to upgrade your server to Voltaire Pro. (This can be done via the `!volt pro` command.)");
                 return;
             }
 
-            var prefix = PrefixHelper.ComputePrefix(context, dbGuild);
+            var prefix = PrefixHelper.ComputePrefix(context.User, dbGuild);
             var channel = candidateChannels.OrderBy(x => x.Name.Length).First();
-            var messageFunction = Send.SendMessageToChannel(channel, replyable, context, dbGuild.UseEmbed);
+            var messageFunction = Send.SendMessageToChannel(channel, replyable, context.User, context.Channel, dbGuild.UseEmbed);
             await messageFunction(prefix, message);
             await Send.SendSentEmote(context);
             return;

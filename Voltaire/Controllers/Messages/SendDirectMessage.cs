@@ -38,7 +38,7 @@ namespace Voltaire.Controllers.Messages
 
                 if (!allowDmList.Any() && userList.Any())
                 {
-                    await Send.SendErrorWithDeleteReaction(context, "user found, but channel permissions do not allow annonymous direct messaging");
+                    await Send.SendErrorWithDeleteReaction(context.Channel, "user found, but channel permissions do not allow annonymous direct messaging");
                     return;
                 }
 
@@ -46,7 +46,7 @@ namespace Voltaire.Controllers.Messages
 
                 if (!requiredRoleList.Any() && allowDmList.Any())
                 {
-                    await Send.SendErrorWithDeleteReaction(context, "user found, but you do not have the role required to DM them");
+                    await Send.SendErrorWithDeleteReaction(context.Channel, "user found, but you do not have the role required to DM them");
                     return;
                 }
 
@@ -58,13 +58,13 @@ namespace Voltaire.Controllers.Messages
                 }
                 else if (userGuild == null)
                 {
-                    await Send.SendErrorWithDeleteReaction(context, "user not found");
+                    await Send.SendErrorWithDeleteReaction(context.Channel, "user not found");
                     return;
                 }
 
                 var userChannel = await userGuild.Item1.GetOrCreateDMChannelAsync();
-                var prefix = PrefixHelper.ComputePrefix(context, userGuild.Item2, "anonymous user");
-                var messageFunction = Send.SendMessageToChannel(userChannel, replyable, context);
+                var prefix = PrefixHelper.ComputePrefix(context.User, userGuild.Item2, "anonymous user");
+                var messageFunction = Send.SendMessageToChannel(userChannel, replyable, context.User, context.Channel);
                 var sentMessage = await messageFunction(prefix, message);
                 await Send.AddReactionToMessage(sentMessage);
                 await Send.SendSentEmote(context);
