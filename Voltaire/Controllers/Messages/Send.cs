@@ -155,7 +155,8 @@ namespace Voltaire.Controllers.Messages
 
         public static async Task SendSentEmote(ShardedCommandContext context)
         {
-            var emote = Emote.Parse(LoadConfig.Instance.config["sent_emoji"]);
+            //var emote = Emote.Parse(LoadConfig.Instance.config["sent_emoji"]);
+            var emote = new Emoji("✅");
             await context.Message.AddReactionAsync(emote);
         }
 

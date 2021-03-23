@@ -16,6 +16,8 @@ namespace Voltaire
         private CommandService _commands;
         private DiscordShardedClient _client;
         private IServiceProvider _services;
+        private DataBase db;
+        private string prefix = $"!volt ";
 
         public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
@@ -24,7 +26,7 @@ namespace Voltaire
         {
 
             IConfiguration configuration = LoadConfig.Instance.config;
-            var db = new DataBase(configuration.GetConnectionString("sql"));
+            db = new DataBase(configuration.GetConnectionString("sql"));
 
             var config = new DiscordSocketConfig {
                 // LogLevel = LogSeverity.Debug,
@@ -87,7 +89,6 @@ namespace Voltaire
             var context = new ShardedCommandContext(_client, message);
 
             // Create a number to track where the prefix ends and the command begins
-            var prefix = $"!volt ";
             int argPos = prefix.Length - 1;
 
             // short circut DMs
@@ -134,9 +135,16 @@ namespace Voltaire
 
         private async Task SendCommandAsync(ShardedCommandContext context, int argPos)
         {
-            var result = await _commands.ExecuteAsync(context, argPos, _services);
-            if (!result.IsSuccess)
-                await Controllers.Messages.Send.SendErrorWithDeleteReaction(context, result.ErrorReason);
+            if (context.Message.Content.StartsWith(prefix))
+            {
+                var result = await _commands.ExecuteAsync(context, argPos, _services);
+                if (!result.IsSuccess)
+                    await Controllers.Messages.Send.SendErrorWithDeleteReaction(context, result.ErrorReason);
+            }
+            else
+            {
+                await Controllers.Messages.Send.PerformAsync(context, LoadConfig.Instance.config["defaultChannel"], context.Message.Content, false, db);
+            }
         }
 
         private Task Log(LogMessage msg)
